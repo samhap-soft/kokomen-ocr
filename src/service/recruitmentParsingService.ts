@@ -1,29 +1,36 @@
 import { OpenAIClient } from '../ai';
-import { ImageProcessor } from '../imageProcessor';
-import mysql from 'mysql2/promise';
 import { OCRWaitingListRow } from '../types';
+import { createConnection } from '../utils/mysql';
+import { ImageService } from './imageService';
 
 export class RecruitmentParsingService {
-  private imageProcessor: ImageProcessor;
+  private imageService: ImageService;
   private openAIClient: OpenAIClient;
-  private pool: mysql.Pool;
 
-  constructor(pool: mysql.Pool) {
-    this.imageProcessor = new ImageProcessor();
+  constructor() {
+    this.imageService = new ImageService();
     this.openAIClient = new OpenAIClient();
-    this.pool = pool;
+  }
+
+  private async parseRecruitmentFromImage(imageUrl: string, imageId: string) {
+    await this.imageService.fetchImage(imageUrl, imageId);
+    const imagebase64 = await this.imageService.resizeImage(imageId);
+    const text = await this.openAIClient.textDetectionFromAI(imagebase64);
+    return text;
   }
 
   public async parseRecruitmentsFromWaitingList() {
-    this.pool.execute<OCRWaitingListRow[]>('SELECT * FROM ocr_waiting_list').then(([rows]) => {
-      rows.forEach((row) => {
-        const { recruit_id, image_url } = row;
-        this.imageProcessor.resizeImage(image_url).then((imagebase64) => {
-          this.openAIClient.textDetectionFromAI(imagebase64).then((response) => {
-            console.log(response.choices[0].message.content);
-          });
-        });
-      });
+    const connection = await createConnection();
+    const [rows] = await connection.query<OCRWaitingListRow[]>('SELECT * FROM ocr_waiting_list');
+    await connection.end();
+
+    rows.forEach(async (row) => {
+      const connection = await createConnection();
+      const { recruit_id, image_url, id } = row;
+      const text = await this.parseRecruitmentFromImage(image_url, recruit_id.toString());
+      await connection.query('UPDATE recruit SET text = ? WHERE id = ?', [text, recruit_id]);
+      await connection.query('DELETE FROM ocr_waiting_list WHERE id = ?', [id]);
+      await connection.end();
     });
   }
 }
