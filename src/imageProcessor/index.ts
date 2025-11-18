@@ -1,21 +1,22 @@
-import { writeFile } from 'fs/promises';
+import { writeFile, mkdir } from 'fs/promises';
 import sharp from 'sharp';
 import { isArrayBuffer } from 'util/types';
-import { getImagePath } from '../utils/paths.js';
+import { getImagePath, getImagesDirectory } from '../utils/paths.js';
 
 export class ImageProcessor {
-  public fetchImage(imageUrl: string, imageId: string): Promise<void> {
-    return fetch(imageUrl)
-      .then((response) => response.arrayBuffer())
-      .then((buffer) => {
-        if (!buffer) {
-          throw new Error('Failed to fetch image');
-        }
-        return buffer;
-      })
-      .then((buffer) => {
-        writeFile(getImagePath(imageId), new Uint8Array(buffer));
-      });
+  public async fetchImage(imageUrl: string, imageId: string): Promise<void> {
+    // 디렉토리가 없으면 생성
+    const imagesDir = getImagesDirectory();
+    await mkdir(imagesDir, { recursive: true });
+
+    const response = await fetch(imageUrl);
+    const buffer = await response.arrayBuffer();
+
+    if (!buffer) {
+      throw new Error('Failed to fetch image');
+    }
+
+    await writeFile(getImagePath(imageId), new Uint8Array(buffer));
   }
 
   public async resizeImage(imageId: string, width: number = 500): Promise<string> {

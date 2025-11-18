@@ -1,0 +1,176 @@
+name: Build and Deploy to EC2
+
+on:
+    push:
+        branches:
+            - main
+    workflow_dispatch:
+
+jobs:
+    build-and-push:
+        name: Build Docker Image
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Login to Docker Hub
+              uses: docker/login-action@v3
+              with:
+                  username: ${{ secrets.DOCKER_USERNAME }}
+                  password: ${{ secrets.DOCKER_PASSWORD }}
+
+            - name: Docker metadata
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                  images: ${{ secrets.DOCKER_USERNAME }}/zighang-recruitment-parser
+                  tags: |
+                      type=raw,value=latest
+                      type=sha,prefix=sha-
+
+            - name: Build and push Docker image
+              uses: docker/build-push-action@v5
+              with:
+                  context: .
+                  push: true
+                  tags: ${{ steps.meta.outputs.tags }}
+                  cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/zighang-recruitment-parser:buildcache
+                  cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/zighang-recruitment-parser:buildcache,mode=max
+
+            - name: Build summary
+              run: |
+                  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                  echo "✅ Docker image built and pushed successfully!"
+                  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                  echo ""
+                  echo "🏷️  Tags:"
+                  echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n'
+                  echo ""
+                  echo "📦 Image: ${{ secrets.DOCKER_USERNAME }}/zighang-recruitment-parser"
+                  echo "🔀 Branch: ${{ github.ref_name }}"
+                  echo "📝 Commit: ${{ github.sha }}"
+                  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    deploy:
+        name: Deploy to EC2
+        needs: build-and-push
+        runs-on: [org, dev]
+
+        steps:
+            - name: Create .env file
+              run: |
+                  echo "Creating .env file..."
+                  echo "MYSQL_HOST=${{ secrets.MYSQL_HOST }}" > .env
+                  echo "MYSQL_PORT=${{ secrets.MYSQL_PORT }}" >> .env
+                  echo "MYSQL_USER=${{ secrets.MYSQL_USER }}" >> .env
+                  echo "MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}" >> .env
+                  echo "MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}" >> .env
+                  echo "USER_AGENT=${{ secrets.USER_AGENT }}" >> .env
+                  echo "DAILY_REQUEST_LIMIT=${{ secrets.DAILY_REQUEST_LIMIT }}" >> .env
+                  echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> .env
+
+                  # Security: Restrict .env permissions (readable only by owner)
+                  chmod 600 .env
+
+                  echo "✅ .env file created with secure permissions (600)"
+                  echo "ℹ️  AWS credentials will be obtained from EC2 IAM role"
+
+            - name: Login to Docker Hub
+              run: |
+                  echo "Logging in to Docker Hub..."
+                  echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+                  echo "✅ Docker Hub login successful"
+
+            - name: Pull latest Docker image
+              run: |
+                  echo "Pulling latest image from Docker Hub..."
+                  docker pull ${{ secrets.DOCKER_USERNAME }}/zighang-recruitment-parser:latest
+                  echo "✅ Image pulled successfully"
+
+            - name: Stop and remove existing container
+              run: |
+                  echo "Stopping existing containers..."
+                  docker stop zighang-recruitment-parser || true
+                  docker rm zighang-recruitment-parser || true
+                  echo "✅ Old container removed"
+              continue-on-error: true
+
+            - name: Start new container
+              run: |
+                  echo "Starting new container..."
+                  docker run -d \
+                    --name zighang-recruitment-parser \
+                    --restart always \
+                    --env-file .env \
+                    -v $(pwd)/logs:/app/logs \
+                    -v $(pwd)/logs/cron:/var/log \
+                    --network dev-kokomen-net \
+                    ${{ secrets.DOCKER_USERNAME }}/zighang-recruitment-parser:latest
+
+                  echo "✅ Container started successfully"
+
+            - name: Wait for container startup
+              run: |
+                  echo "Waiting 10 seconds for container initialization..."
+                  sleep 10
+
+            - name: Verify deployment
+              run: |
+                  echo "Verifying deployment..."
+
+                  # Check container is running
+                  if ! docker ps | grep -q zighang-recruitment-parser; then
+                    echo "❌ Container not running!"
+                    echo "Showing all containers:"
+                    docker ps -a | grep zighang-recruitment-parser || echo "Container not found"
+                    exit 1
+                  fi
+
+                  echo "✅ Container is running"
+
+                  # Check container health (if healthcheck is configured)
+                  HEALTH=$(docker inspect --format='{{.State.Health.Status}}' zighang-recruitment-parser 2>/dev/null || echo "no-healthcheck")
+                  echo "Container health status: $HEALTH"
+
+                  # Show recent logs for verification
+                  echo ""
+                  echo "=== Recent Container Logs ==="
+                  docker logs --tail 30 zighang-recruitment-parser
+
+            - name: Cleanup sensitive files
+              if: always()
+              run: |
+                  # Remove .env file after deployment for security
+                  if [ -f .env ]; then
+                    rm -f .env
+                    echo "✅ Removed .env file"
+                  fi
+
+                  # Logout from Docker Hub
+                  docker logout
+
+                  echo "✅ Cleanup completed"
+
+            - name: Deployment summary
+              run: |
+                  echo ""
+                  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                  echo "✅ Deployment completed successfully!"
+                  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                  echo ""
+                  echo "📦 Container: zighang-recruitment-parser"
+                  echo "🖥️  Runner: ${{ runner.name }}"
+                  echo "🐳 Image: ${{ secrets.DOCKER_USERNAME }}/zighang-recruitment-parser:latest"
+                  echo "🔀 Branch: ${{ github.ref_name }}"
+                  echo "📝 Commit: ${{ github.sha }}"
+                  echo ""
+                  echo "📊 Container Status:"
+                  docker ps --filter "name=zighang-recruitment-parser" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+                  echo ""
+                  echo "💡 View logs: docker logs -f zighang-recruitment-parser"
+                  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

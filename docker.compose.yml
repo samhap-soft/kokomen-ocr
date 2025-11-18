@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  recruitment-parser:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: recruitment-parser:latest
+    container_name: recruitment-parser
+    restart: "no"
+
+    # 환경변수 파일 로드
+    env_file:
+      - .env
+
+    # 볼륨 마운트 (로그 영속화)
+    volumes:
+      - ./logs:/app/logs
+
+    # 로그 설정
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
