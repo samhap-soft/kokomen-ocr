@@ -1,8 +1,8 @@
 # 채용 상세공고 파서 Cron 스케줄
 # 컨테이너 내부에서 실행
 
-# 매일 오전 7시 KST (UTC 기준 22시 전날) 실행
-# 한국 시간 오전 7시 = UTC 22:00 (전날)
-0 7 * * * root bash -c 'source /etc/cron.d/env-vars && cd /app && node dist/index.js' >> /var/log/cron.log 2>&1
+# 매일 오전 7시 KST 실행
+# 환경변수는 /etc/environment에서 로드됨
+0 7 * * * root /bin/bash -c 'cd /app && . /etc/environment && /bin/bash /app/run_recruitment_parse.sh >> /var/log/cron.log 2>&1'
 
 # 빈 줄 필수 (cron 요구사항)
