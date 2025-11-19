@@ -48,6 +48,7 @@ export class RecruitmentParsingService {
       }
     } catch (error) {
       console.error('Error parsing recruitments from waiting list', error);
+      await connection.rollback();
     } finally {
       await connection.end();
       console.log('connection end');

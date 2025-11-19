@@ -11,11 +11,11 @@ describe('MySQL Utility', () => {
     jest.clearAllMocks();
     process.env = {
       ...originalEnv,
-      DB_HOST: 'localhost',
-      DB_USER: 'testuser',
-      DB_PASSWORD: 'testpassword',
-      DB_NAME: 'testdb',
-      DB_PORT: '3306',
+      MYSQL_HOST: 'localhost',
+      MYSQL_USER: 'testuser',
+      MYSQL_PASSWORD: 'testpassword',
+      MYSQL_DATABASE: 'testdb',
+      MYSQL_PORT: '3306',
     };
   });
 
@@ -31,7 +31,9 @@ describe('MySQL Utility', () => {
         end: jest.fn(),
       };
 
-      (mysql.createConnection as jest.MockedFunction<typeof mysql.createConnection>).mockResolvedValue(mockConnection as any);
+      (
+        mysql.createConnection as jest.MockedFunction<typeof mysql.createConnection>
+      ).mockResolvedValue(mockConnection as any);
 
       const connection = await createConnection();
 
@@ -53,7 +55,9 @@ describe('MySQL Utility', () => {
         end: jest.fn(),
       };
 
-      (mysql.createConnection as jest.MockedFunction<typeof mysql.createConnection>).mockResolvedValue(mockConnection as any);
+      (
+        mysql.createConnection as jest.MockedFunction<typeof mysql.createConnection>
+      ).mockResolvedValue(mockConnection as any);
 
       await createConnection();
 
@@ -72,20 +76,24 @@ describe('MySQL Utility', () => {
         end: jest.fn(),
       };
 
-      (mysql.createConnection as jest.MockedFunction<typeof mysql.createConnection>).mockResolvedValue(mockConnection as any);
+      (
+        mysql.createConnection as jest.MockedFunction<typeof mysql.createConnection>
+      ).mockResolvedValue(mockConnection as any);
 
       await createConnection();
 
       expect(mysql.createConnection).toHaveBeenCalledWith(
         expect.objectContaining({
-          port: 5432,
+          port: 3306,
         })
       );
     });
 
     it('should handle connection errors', async () => {
       const mockError = new Error('Connection failed');
-      (mysql.createConnection as jest.MockedFunction<typeof mysql.createConnection>).mockRejectedValue(mockError);
+      (
+        mysql.createConnection as jest.MockedFunction<typeof mysql.createConnection>
+      ).mockRejectedValue(mockError);
 
       await expect(createConnection()).rejects.toThrow('Connection failed');
     });
@@ -96,11 +104,15 @@ describe('MySQL Utility', () => {
         end: jest.fn(),
       };
 
-      (mysql.createConnection as jest.MockedFunction<typeof mysql.createConnection>).mockResolvedValue(mockConnection as any);
+      (
+        mysql.createConnection as jest.MockedFunction<typeof mysql.createConnection>
+      ).mockResolvedValue(mockConnection as any);
 
       await createConnection();
 
-      const callArgs = (mysql.createConnection as jest.MockedFunction<typeof mysql.createConnection>).mock.calls[0][0];
+      const callArgs = (
+        mysql.createConnection as jest.MockedFunction<typeof mysql.createConnection>
+      ).mock.calls[0][0];
 
       expect(callArgs).toEqual({
         host: 'localhost',
