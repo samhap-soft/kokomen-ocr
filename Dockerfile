@@ -27,10 +27,8 @@ COPY src ./src
 # TypeScript 빌드
 RUN pnpm run build
 
-COPY dist ./dist
-
 # 로그 및 이미지 디렉토리 생성
-RUN mkdir -p /app/images
+RUN mkdir -p /app/logs /app/images
 
 # 크론 스크립트 및 테스트 파일 복사
 COPY run_recruitment_parse.sh /app/run_recruitment_parse.sh
