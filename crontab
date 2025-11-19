@@ -3,6 +3,6 @@
 
 # 매일 오전 7시 KST 실행
 # 환경변수는 /etc/environment에서 로드됨
-0 7 * * * root /bin/bash -c 'cd /app && . /etc/environment && /bin/bash /app/run_recruitment_parse.sh >> /var/log/cron.log 2>&1'
+0 7 * * * root /bin/bash -c 'cd /app && . /etc/environment && /bin/bash /app/run_recruitment_parse.sh >> /var/log/recruitment-parser.log 2>&1'
 
 # 빈 줄 필수 (cron 요구사항)
