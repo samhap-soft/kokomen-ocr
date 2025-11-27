@@ -110,7 +110,6 @@ jobs:
             --env-file .env \
             -v $(pwd)/logs:/app/logs \
             -v $(pwd)/logs/cron:/var/log \
-            --network dev-kokomen-net \
             ${{ secrets.DOCKER_USERNAME }}/zighang-recruitment-parser:latest
 
           echo "✅ Container started successfully"
