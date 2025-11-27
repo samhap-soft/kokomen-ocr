@@ -59,7 +59,7 @@ jobs:
   deploy:
     name: Deploy to EC2
     needs: build-and-push
-    runs-on: [org, dev]
+    runs-on: [org, ocr]
 
     steps:
       - name: Create .env file
